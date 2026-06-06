@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(ros_gz_sim REQUIRED)
 
-install(DIRECTORY launch models config src worlds hooks
+install(DIRECTORY launch models worlds hooks config
   DESTINATION share/${PROJECT_NAME}/
 )
 
