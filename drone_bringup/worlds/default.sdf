@@ -13,6 +13,12 @@
             name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-imu-system"
+          name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-air-pressure-system"
+      name="gz::sim::systems::AirPressure"/>
+    <plugin filename="gz-sim-magnetometer-system"
+          name="gz::sim::systems::Magnetometer"/>
 
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
