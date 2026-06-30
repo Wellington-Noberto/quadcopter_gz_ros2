@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <sdf version="1.9">
-  <world name="default">
+  <world name="quadcopter_playground">
     <physics type="ode">
       <max_step_size>0.004</max_step_size>
       <real_time_factor>1.0</real_time_factor>
@@ -20,6 +20,7 @@
     <plugin filename="gz-sim-magnetometer-system"
           name="gz::sim::systems::Magnetometer"/>
 
+    
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
     <atmosphere type="adiabatic"/>
