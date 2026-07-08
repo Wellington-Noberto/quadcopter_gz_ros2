@@ -36,6 +36,29 @@ StateEstimationNode::StateEstimationNode(const rclcpp::NodeOptions & options) : 
   altitude_publisher_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("x500/altitude", 10);
 }
 
+void StateEstimationNode::compute_state_transition_jacobian(const Eigen::Vector3d& accel_measured, 
+                                      const Eigen::Vector3d& gyro_measured, 
+                                      double dt)
+{
+
+  Matrix15d A_;  
+  A_.setZero();
+
+  // skew_symmetric
+  // R
+  auto R = Eigen::Matrix3d::Identity(); // Placeholder for the rotation matrix, replace with actual rotation matrix if available
+
+  A_.block<3, 3>(POS, VEL) = Eigen::Matrix3d::Identity(); // Position to velocity
+  A_.block<3, 3>(VEL, ATT) = -R * skewSymmetric(accel_measured); // Velocity to attitude
+  A_.block<3, 3>(VEL, B_ACC) = -R; // Velocity to gyroscope bias
+  A_.block<3, 3>(ATT, ATT) = -skewSymmetric(gyro_measured); // Velocity to accelerometer bias
+  A_.block<3, 3>(ATT, B_GYRO) = -Eigen::Matrix3d::Identity(); // Attitude to gyroscope bias
+
+  F_.setIdentity(); // Initialize F_ as an identity matrix
+  F_ += A_ * dt; // Update the state transition Jacobian with the computed A_ matrix
+
+}
+
 void StateEstimationNode::imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 // Process IMU data to estimate roll and pitch angles
@@ -71,7 +94,7 @@ void StateEstimationNode::predict_state()
 {
   // Create a state vector and covariance matrix for the drone's state estimation
 
-
+  F_ = Matrix15d::Zero(); 
 
   // x_predicted_ = A_ * x_estimated_ + B_ * u_; // Predict the next state based on the previous state and control inputs
   // IMU data can be used to update the control inputs (u_) for the prediction step
