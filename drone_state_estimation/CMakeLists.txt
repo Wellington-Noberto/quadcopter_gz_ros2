@@ -16,6 +16,7 @@ find_package(Eigen3 REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/state_estimation.cpp
+  src/eskf_core.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -61,9 +62,9 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
 
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_ekf_core test/test_ekf_core.cpp src/state_estimation.cpp)
-  target_include_directories(test_ekf_core PUBLIC include)
-  ament_target_dependencies(test_ekf_core Eigen3)
+  ament_add_gtest(test_eskf_core test/test_eskf_core.cpp src/eskf_core.cpp)
+  target_include_directories(test_eskf_core PUBLIC include)
+  ament_target_dependencies(test_eskf_core Eigen3)
 
   ament_lint_auto_find_test_dependencies()
 endif()
