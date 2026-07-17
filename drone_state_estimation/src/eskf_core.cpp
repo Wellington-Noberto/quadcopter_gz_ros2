@@ -36,21 +36,18 @@ MEKF::predict_states(const NominalState& x,
   Eigen::Vector3d pos      = x.pos;
   Eigen::Vector3d vel      = x.vel;
   Eigen::Quaterniond attitude_q = x.att_quat;
-  Eigen::Vector3d b_acc    = x.b_acc;
-  Eigen::Vector3d b_gyro   = x.b_gyro;
+  Eigen::Vector3d accel_corrected = accel_measured - x.b_acc;
+  Eigen::Vector3d gyro_corrected  = gyro_measured  - x.b_gyro;
 
   Eigen::Matrix3d R = attitude_q.toRotationMatrix();
-
-  Eigen::Vector3d accel_corrected = accel_measured - b_acc;
-  Eigen::Vector3d gyro_corrected  = gyro_measured  - b_gyro;
 
   Eigen::Vector3d gravity(0, 0, -9.81);  // Gravity vector in the world frame (>> assuming z is up <<)
 
   x_next.pos = pos + vel * dt;
   x_next.vel = vel + (R * accel_corrected + gravity) * dt;
   x_next.att_quat = (attitude_q *  compute_delta_q(gyro_corrected, dt)).normalized();  // << Correct here
-  x_next.b_acc = b_acc;
-  x_next.b_gyro = b_gyro;
+  x_next.b_acc = x.b_acc;
+  x_next.b_gyro = x.b_gyro;
 
   return x_next;
 }
@@ -65,10 +62,8 @@ MEKF::compute_state_jacobian(const NominalState& x,
   ErrorStateMatrix A;  
   A.setZero();
   // Compute true states
-  Eigen::Vector3d b_acc    = x.b_acc;
-  Eigen::Vector3d b_gyro   = x.b_gyro;
-  Eigen::Vector3d accel_corrected = accel_measured - b_acc;
-  Eigen::Vector3d gyro_corrected  = gyro_measured  - b_gyro;
+  Eigen::Vector3d accel_corrected = accel_measured - x.b_acc;
+  Eigen::Vector3d gyro_corrected  = gyro_measured  - x.b_gyro;
 
   // Compute Rotation matrix from Euler angles
   Eigen::Quaterniond attitude_q = x.att_quat;
@@ -81,9 +76,49 @@ MEKF::compute_state_jacobian(const NominalState& x,
   A.block<3, 3>(ATT, B_GYRO) = -Eigen::Matrix3d::Identity(); // Attitude to gyroscope bias
 
   ErrorStateMatrix F = ErrorStateMatrix::Identity();
-  F += A * dt; // Update the state transition Jacobian with the computed A matrix
-
+  F += A * dt + 1/2 * A * A * dt * dt; // Update the state transition Jacobian with the computed A matrix
+  // ToDo: Second order approximation
   return F;
 }
 
+ProcessNoiseCovariance MEKF::initialize_process_noise_covariance(const NoiseStdDev& process_noise_stddev)
+{
+  ProcessNoiseCovariance Qc;
+  Qc.setZero(); 
+
+  Qc.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * process_noise_stddev.accel_noise_stddev.squaredNorm();
+  Qc.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * process_noise_stddev.gyro_noise_stddev.squaredNorm();
+  Qc.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * process_noise_stddev.gyro_bias_noise_stddev.squaredNorm();
+  Qc.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * process_noise_stddev.accel_bias_noise_stddev.squaredNorm();
+
+  return Qc;
 }
+
+NoiseJacobian MEKF::compute_process_noise_jacobian(const NominalState& x)
+{
+  NoiseJacobian L{NoiseJacobian::Zero()};
+  Eigen::Matrix3d R = x.att_quat.toRotationMatrix();
+
+  L.block<3, 3>(3, 3)  = -R;
+  L.block<3, 3>(6, 0)  = -Eigen::Matrix3d::Identity();
+  L.block<3, 3>(9, 6)  =  Eigen::Matrix3d::Identity();
+  L.block<3, 3>(12, 9) =  Eigen::Matrix3d::Identity();
+
+  return L;
+}
+
+ErrorStateMatrix MEKF::compute_process_noise_covariance(const NominalState& x,
+                                                        const NoiseStdDev& noise_params,
+                                                        double dt)
+{
+  ProcessNoiseCovariance Qc = initialize_process_noise_covariance(noise_params);
+  NoiseJacobian L = compute_process_noise_jacobian(x);
+  
+  return L * Qc * L.transpose() * dt;   // First order approximation of the process noise covariance
+}
+
+
+} // namespace drone_state_estimation
+
+
+

@@ -7,8 +7,11 @@ namespace drone_state_estimation
 {
   
 const int STATE_SIZE = 15;
-using ErrorStateVector = Eigen::Matrix<double, STATE_SIZE, 1>;
-using ErrorStateMatrix = Eigen::Matrix<double, STATE_SIZE, STATE_SIZE>;
+const int NOISE_SIZE = 12;
+using ErrorStateVector       = Eigen::Matrix<double, STATE_SIZE, 1>;
+using ErrorStateMatrix       = Eigen::Matrix<double, STATE_SIZE, STATE_SIZE>;
+using ProcessNoiseCovariance = Eigen::Matrix<double, NOISE_SIZE, NOISE_SIZE>;
+using NoiseJacobian          = Eigen::Matrix<double, STATE_SIZE, NOISE_SIZE>;
 
 struct NominalState {
   Eigen::Vector3d pos{Eigen::Vector3d::Zero()};  // Position (x, y, z)
@@ -16,6 +19,13 @@ struct NominalState {
   Eigen::Quaterniond att_quat{Eigen::Quaterniond::Identity()};  // Attitude (quaternion)
   Eigen::Vector3d b_acc{Eigen::Vector3d::Zero()};  // Accelerometer bias
   Eigen::Vector3d b_gyro{Eigen::Vector3d::Zero()};  // Gyroscope bias
+};
+
+struct NoiseStdDev {
+  Eigen::Vector3d accel_noise_stddev{Eigen::Vector3d::Zero()};  // Accelerometer noise standard deviation
+  Eigen::Vector3d gyro_noise_stddev{Eigen::Vector3d::Zero()};  // Gyroscope noise standard deviation
+  Eigen::Vector3d accel_bias_noise_stddev{Eigen::Vector3d::Zero()};  // Accelerometer bias noise standard deviation
+  Eigen::Vector3d gyro_bias_noise_stddev{Eigen::Vector3d::Zero()};  // Gyroscope bias noise standard deviation
 };
 
 enum StateIndex
@@ -46,7 +56,14 @@ public:
                                          const Eigen::Vector3d& accel_measured, 
                                          const Eigen::Vector3d& gyro_measured, 
                                          double dt);
+  
+  ProcessNoiseCovariance initialize_process_noise_covariance(const NoiseStdDev& process_noise_stddev);
 
+  NoiseJacobian compute_process_noise_jacobian(const NominalState& x);
+  
+  ErrorStateMatrix compute_process_noise_covariance(const NominalState& x,
+                                                    const NoiseStdDev& noise_params,
+                                                    double dt);
 
   inline Eigen::Matrix3d rotationMatrixFromEulerAngles(const Eigen::Vector3d& euler_angles) {
     double roll = euler_angles(0);

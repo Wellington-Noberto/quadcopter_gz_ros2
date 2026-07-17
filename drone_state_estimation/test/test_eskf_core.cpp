@@ -157,3 +157,49 @@ TEST(MEKF, TestStateTransitionJacobian)
 
   EXPECT_TRUE(F_computed.isApprox(F_numeric, 1e-5));
 }
+
+TEST(MEKF, ProcessNoiseCovarianceIsSymmetricPSD)
+{
+  drone_state_estimation::MEKF kf;
+  drone_state_estimation::NominalState x;  // identity/zero default
+  drone_state_estimation::NoiseStdDev noise;
+  noise.accel_noise_stddev   = Eigen::Vector3d::Constant(0.05);
+  noise.gyro_noise_stddev    = Eigen::Vector3d::Constant(0.01);
+  noise.accel_bias_noise_stddev = Eigen::Vector3d::Constant(0.001);
+  noise.gyro_bias_noise_stddev  = Eigen::Vector3d::Constant(0.0001);
+
+  drone_state_estimation::ErrorStateMatrix Q = kf.compute_process_noise_covariance(x, noise, 0.01);
+
+  EXPECT_TRUE(Q.isApprox(Q.transpose(), 1e-12));
+
+  Eigen::SelfAdjointEigenSolver<drone_state_estimation::ErrorStateMatrix> solver(Q);
+  EXPECT_TRUE((solver.eigenvalues().array() >= -1e-9).all());
+}
+
+TEST(MEKF, ProcessNoiseCovarianceScalesLinearlyWithDt)
+{
+  drone_state_estimation::MEKF kf;
+  drone_state_estimation::NominalState x;
+  drone_state_estimation::NoiseStdDev noise;  
+  noise.accel_noise_stddev   = Eigen::Vector3d::Constant(0.05);
+  noise.gyro_noise_stddev    = Eigen::Vector3d::Constant(0.01);
+  noise.accel_bias_noise_stddev = Eigen::Vector3d::Constant(0.001);
+  noise.gyro_bias_noise_stddev  = Eigen::Vector3d::Constant(0.0001);
+
+  drone_state_estimation::ErrorStateMatrix Q1 = kf.compute_process_noise_covariance(x, noise, 0.01);
+  drone_state_estimation::ErrorStateMatrix Q2 = kf.compute_process_noise_covariance(x, noise, 0.02);
+
+  EXPECT_TRUE(Q2.isApprox(2.0 * Q1, 1e-9)); 
+}
+
+TEST(MEKF, ProcessNoiseCovarianceHasNoDirectPositionBlock)
+{
+  drone_state_estimation::MEKF kf;
+  drone_state_estimation::NominalState x;
+  drone_state_estimation::NoiseStdDev noise;
+  noise.accel_noise_stddev = Eigen::Vector3d::Constant(0.05);
+  drone_state_estimation::ErrorStateMatrix Q = kf.compute_process_noise_covariance(x, noise, 0.01);
+  bool is_zero = Q.block<3, 3>(0, 0).isZero(1e-12);
+
+  EXPECT_TRUE(is_zero);
+}
