@@ -42,28 +42,38 @@ class MEKF
 {
 public:
   MEKF();
-  void predict(const Eigen::VectorXd& u, double dt);
+  void predict(const Eigen::Vector3d& accel_measured,
+               const Eigen::Vector3d& gyro_measured,
+               const NoiseStdDev& noise_params, double dt);
   void update(const Eigen::VectorXd& z);
 
   NominalState predict_states(const NominalState& x,
                               const Eigen::Vector3d& accel_measured,
                               const Eigen::Vector3d& gyro_measured,
-                              double dt);
+                              double dt) const;
 
-  Eigen::Quaterniond compute_delta_q(const Eigen::Vector3d& delta_theta, double dt);
+  Eigen::Quaterniond compute_delta_q(const Eigen::Vector3d& delta_theta, double dt) const;
 
   ErrorStateMatrix compute_state_jacobian(const NominalState& x,
                                          const Eigen::Vector3d& accel_measured, 
                                          const Eigen::Vector3d& gyro_measured, 
-                                         double dt);
-  
-  ProcessNoiseCovariance initialize_process_noise_covariance(const NoiseStdDev& process_noise_stddev);
+                                         double dt) const;
 
-  NoiseJacobian compute_process_noise_jacobian(const NominalState& x);
+  
+  
+  ProcessNoiseCovariance initialize_process_noise_covariance(const NoiseStdDev& process_noise_stddev) const;
+
+  NoiseJacobian compute_process_noise_jacobian(const NominalState& x) const;
   
   ErrorStateMatrix compute_process_noise_covariance(const NominalState& x,
                                                     const NoiseStdDev& noise_params,
-                                                    double dt);
+                                                    double dt) const;
+
+  ErrorStateMatrix propagate_covariance(const ErrorStateMatrix& P, 
+                                      const ErrorStateMatrix& F, 
+                                      const ErrorStateMatrix& ) const;
+
+
 
   inline Eigen::Matrix3d rotationMatrixFromEulerAngles(const Eigen::Vector3d& euler_angles) {
     double roll = euler_angles(0);
@@ -77,7 +87,7 @@ public:
     return R;
   }
 
-  inline Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d& v) {
+  inline Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d& v) const{
     Eigen::Matrix3d skew;
     skew <<   0,   -v.z(),  v.y(),
             v.z(),    0,   -v.x(),
@@ -89,12 +99,11 @@ public:
 private:
   // State Covariance Matrix
   ErrorStateMatrix P_;    
-  // State Transition Jacobian
-  ErrorStateMatrix F_;
+
   // State vector: [position(3), velocity(3), orientation(3), angular_velocity(3), linear_acceleration(3)]
   ErrorStateVector x_error_states_;
   // Nominal state vector: [position(3), velocity(3), orientation(3), angular_velocity(3), linear_acceleration(3)]
-  ErrorStateVector x_nominal_states_;
+  NominalState x_;
 };
 
 }  // namespace drone_state_estimation

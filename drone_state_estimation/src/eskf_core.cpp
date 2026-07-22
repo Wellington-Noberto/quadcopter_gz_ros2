@@ -6,12 +6,10 @@ namespace drone_state_estimation
 MEKF::MEKF()
 {
   P_.setIdentity(); // Initialize state covariance matrix
-  F_.setIdentity(); // Initialize state transition Jacobian
   x_error_states_.setZero(); // Initialize error state vector
-  x_nominal_states_.setZero(); // Initialize nominal state vector
 }
 
-Eigen::Quaterniond MEKF::compute_delta_q(const Eigen::Vector3d& delta_theta, double dt)
+Eigen::Quaterniond MEKF::compute_delta_q(const Eigen::Vector3d& delta_theta, double dt) const
 {
   Eigen::Vector3d phi = delta_theta * dt;
   double angle = phi.norm();
@@ -29,7 +27,7 @@ NominalState
 MEKF::predict_states(const NominalState& x,
                     const Eigen::Vector3d& accel_measured,
                     const Eigen::Vector3d& gyro_measured,
-                    double dt)
+                    double dt) const
 {
   NominalState x_next = x;
 
@@ -56,7 +54,7 @@ ErrorStateMatrix
 MEKF::compute_state_jacobian(const NominalState& x,
                             const Eigen::Vector3d& accel_measured, 
                             const Eigen::Vector3d& gyro_measured, 
-                            double dt)
+                            double dt) const
 {
 
   ErrorStateMatrix A;  
@@ -81,7 +79,7 @@ MEKF::compute_state_jacobian(const NominalState& x,
   return F;
 }
 
-ProcessNoiseCovariance MEKF::initialize_process_noise_covariance(const NoiseStdDev& process_noise_stddev)
+ProcessNoiseCovariance MEKF::initialize_process_noise_covariance(const NoiseStdDev& process_noise_stddev) const
 {
   ProcessNoiseCovariance Qc;
   Qc.setZero(); 
@@ -94,7 +92,7 @@ ProcessNoiseCovariance MEKF::initialize_process_noise_covariance(const NoiseStdD
   return Qc;
 }
 
-NoiseJacobian MEKF::compute_process_noise_jacobian(const NominalState& x)
+NoiseJacobian MEKF::compute_process_noise_jacobian(const NominalState& x) const
 {
   NoiseJacobian L{NoiseJacobian::Zero()};
   Eigen::Matrix3d R = x.att_quat.toRotationMatrix();
@@ -109,12 +107,38 @@ NoiseJacobian MEKF::compute_process_noise_jacobian(const NominalState& x)
 
 ErrorStateMatrix MEKF::compute_process_noise_covariance(const NominalState& x,
                                                         const NoiseStdDev& noise_params,
-                                                        double dt)
+                                                        double dt) const
 {
   ProcessNoiseCovariance Qc = initialize_process_noise_covariance(noise_params);
   NoiseJacobian L = compute_process_noise_jacobian(x);
   
   return L * Qc * L.transpose() * dt;   // First order approximation of the process noise covariance
+}
+
+ErrorStateMatrix MEKF::propagate_covariance(const ErrorStateMatrix& P, 
+                                            const ErrorStateMatrix& F, 
+                                            const ErrorStateMatrix& Q) const
+{
+  return F * P * F.transpose() + Q;  // Propagate the state covariance matrix
+}
+
+void MEKF::predict(const Eigen::Vector3d& accel_measured,
+                  const Eigen::Vector3d& gyro_measured,
+                  const NoiseStdDev& noise_params,
+                  double dt)
+{
+  // Implement the prediction step of the MEKF here
+  // std_msgs/Header header
+  // string child_frame_id
+  // geometry_msgs/PoseWithCovariance pose
+  // geometry_msgs/TwistWithCovariance twist
+
+
+  const ErrorStateMatrix F = compute_state_jacobian(x_, accel_measured, gyro_measured, dt);
+  const ErrorStateMatrix Q = compute_process_noise_covariance(x_, noise_params, dt);
+
+  x_ = predict_states(x_, accel_measured, gyro_measured, dt);
+  P_ = propagate_covariance(P_, F, Q);
 }
 
 

@@ -203,3 +203,25 @@ TEST(MEKF, ProcessNoiseCovarianceHasNoDirectPositionBlock)
 
   EXPECT_TRUE(is_zero);
 }
+
+TEST(MEKF, DeadReckoningPrediction)
+{
+  drone_state_estimation::MEKF kf;
+  drone_state_estimation::NominalState x;
+  x.pos << 0.0, 0.0, 0.0;
+  x.vel << 1.0, 0.0, 0.0; // moving along x-axis
+  x.att_quat = Eigen::Quaterniond::Identity();
+  
+  double dt = 1.0; // 1 second
+  Eigen::Vector3d accel_measured(0.0, 0.0, -9.81); // only gravity
+  Eigen::Vector3d gyro_measured(0.0, 0.0, 0.0); // no rotation
+
+  drone_state_estimation::NominalState x_pred = kf.predict_states(x, accel_measured, gyro_measured, dt);
+
+  std::cout << "Predicted position: " << x_pred.pos.transpose() << std::endl;
+  std::cout << "Predicted velocity: " << x_pred.vel.transpose() << std::endl;
+
+  EXPECT_NEAR(x_pred.pos.x(), x.pos.x() + x.vel.x() * dt, 1e-6);
+  EXPECT_NEAR(x_pred.pos.y(), x.pos.y(), 1e-6);
+  EXPECT_NEAR(x_pred.pos.z(), x.pos.z(), 1e-6);
+}
